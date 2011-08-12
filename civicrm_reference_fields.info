@@ -1,0 +1,13 @@
+name = CiviCRM Reference Fields
+description = Provide fields for  CiviCRM Event, CiviCRM Contribution
+package = CiviCRM
+core = 7.x
+version = 2.alpha1
+php = 5.3
+
+dependencies[] = civicrm
+dependencies[] = text
+dependencies[] = list
+
+files[] = civicrm_reference_fields.install
+files[] = civicrm_reference_fields.module

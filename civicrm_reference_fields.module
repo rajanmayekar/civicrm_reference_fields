@@ -1,0 +1,420 @@
+<?php
+
+ /**
+ * Implemetation of hook_menu, retrieve conatacts from civicrm for
+ * autocomplete widget.
+ */
+function civicrm_reference_fields_menu() 
+{
+    $items = array();
+    $items['civicrm_reference_field/autocomplete/%'] = 
+        array(
+              'title'            => t('Contacts'),
+              'page callback'    => 'civicrm_reference_fields_autocomplete_value',
+              'type'             => MENU_CALLBACK,
+              'access arguments' => array('access content')
+              );
+    
+    return $items;
+}
+
+/**
+ * Implemetation of hook_field_info
+ */
+function civicrm_reference_fields_field_info( ) {
+    return array(
+                 'civicrm_reference_fields_contribution' => 
+                 array(
+                       'label'             => t('CiviCRM Contribution Pages'),
+                       'description'       => t('Reference a CiviCRM Contribution Pages.'),
+                       'default_widget'    => 'options_select',
+                       'default_formatter' => 'civicrm_reference_fields_link',
+                       ),
+                 'civicrm_reference_fields_event' => 
+                 array(
+                       'label'             => t('CiviCRM Event Info Pages'),
+                       'description'       => t('Reference a CiviCRM Event Info Pages.'),
+                       'default_widget'    => 'options_select',
+                       'default_formatter' => 'civicrm_reference_fields_link',
+                       ),
+                 );
+}
+
+/**
+ * Implemetation of hook_field_widget_info
+ */
+function civicrm_reference_fields_field_widget_info() {
+    return array(
+                 'civicrm_reference_fields_autocomplete_contribution' => 
+                 array(
+                       'label' => t('Autocomplete text field'),
+                       'field types' => array('civicrm_reference_fields_contribution'),
+                       'settings' => array(
+                                           'size' => 100,
+                                           'autocomplete_path' => 'civicrm_contact_ref/autocomplete/contribution',
+                                           ),
+                       ),
+                 'civicrm_reference_fields_autocomplete_event' => 
+                 array(
+                       'label' => t('Autocomplete text field'),
+                       'field types' => array('civicrm_reference_fields_event'),
+                       'settings' => array(
+                                           'size' => 100,
+                                           'autocomplete_path' => 'civicrm_contact_ref/autocomplete/event',
+                                           ),
+                       )
+                 );
+                 
+}
+
+/**
+ * Implemetation of hook_field_widget_info_alter
+ */
+function civicrm_reference_fields_field_widget_info_alter(&$info) {
+    $info['options_select']['field types'][] = 'civicrm_reference_fields_contribution';
+    $info['options_select']['field types'][] = 'civicrm_reference_fields_event';
+    $info['options_buttons']['field types'][] = 'civicrm_reference_fields_contribution';
+    $info['options_buttons']['field types'][] = 'civicrm_reference_fields_event';
+}
+
+/**
+ * Implements hook_options_list().
+ */
+function civicrm_reference_fields_options_list($field) {
+  $function = !empty($field['settings']['options_list_callback']) ? $field['settings']['options_list_callback'] : 'civicrm_reference_fields_allowed_values';
+  return $function($field);
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function civicrm_reference_fields_field_is_empty($item, $field) 
+{  
+    return empty($item['civicrm_reference_id'])? true : false;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function civicrm_reference_fields_field_formatter_info() 
+{
+    return array(
+                 'civicrm_reference_fields_link' => array(
+                                                     'label'           => t('Title (link)'),
+                                                     'field types'     => array('civicrm_reference_fields_autocomplete_contribution', 'civicrm_reference_fields_autocomplete_event')
+                                                     ),
+                 'civicrm_reference_fields_plain' => array(
+                                                      'label'           => t('Title (plain)'),
+                                                      'field types'     => array('civicrm_reference_fields_autocomplete_contribution', 'civicrm_reference_fields_autocomplete_event')
+                                                      )
+                 
+                 );
+}
+
+/**
+ * Implements hook_field_formatter_view()
+ */
+function civicrm_reference_fields_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  
+  if (!($values = _civicrm_reference_fields_get_details($items, $field))) return $element;
+  
+  $field_type = _civicrm_reference_fields_get_type($field);
+  $field_id   = 'civicrm_reference_id';
+  
+  switch ($display['type']) {
+    case 'civicrm_reference_fields_link':
+        $path = '';
+        if ($field_type == 'contribution') {
+            $path = 'civicrm/contribute/transact';
+        } elseif ($field_type == 'event') {
+            $path = 'civicrm/event/info';
+        }
+        foreach ($items as $delta => $item) {
+            if (!empty($item[$field_id]) &&  isset($values[$item[$field_id]])) {
+                $item_details = $values[$item[$field_id]];
+                $element[$delta] = 
+                    array(
+                          '#markup' => l($item_details['title'], 
+                                         $path, 
+                                         array('query' => 
+                                               array('reset' => 1,
+                                                     'id'    => $item_details['id'])))
+                          );
+          }
+      }
+      break;
+
+  case 'civicrm_reference_fields_plain':
+      foreach ($items as $delta => $item) {
+          if (isset($item[$field_id]) && is_numeric($item[$field_id])) {
+              $element[$delta] = 
+              array(
+                    '#markup' => _civicrm_reference_fields_get_title($item[$field_id]),
+                    );
+          }
+      }
+      break;
+  }
+
+  return $element;
+}
+
+/**
+ * Returns the set of valid civicrm contacts
+ *
+ * @param $field
+ *   The field definition.
+ * @return
+ *   The array of valid contacts.
+ */
+function civicrm_reference_fields_allowed_values($field) {
+    
+    $function = '_civicrm_reference_fields_get_values_' . _civicrm_reference_fields_get_type($field);
+    $references = $function( );
+    $options = array();
+    foreach ($references as $key => $value) {
+        $options[$key] = html_entity_decode(strip_tags($value['title']));
+    }
+    return $options;
+}
+
+
+function _civicrm_reference_fields_get_values_contribution($ids=array( ), $limit=25) {
+    $references = array();
+    if (!civicrm_initialize()) return $references;
+
+    $query = "SELECT id, title FROM civicrm_contribution_page WHERE is_active = 1 ";
+    if (!empty($ids)) {
+        $query .= "AND id IN (" . implode(',', $ids) . ')'; 
+    }
+    $query .= " ORDER BY start_date, title";    
+    if ( $limit ) {
+        $query .= " LIMIT 0, $limit"; 
+    }
+
+    $pages = CRM_Core_DAO::executeQuery($query);
+    while( $pages->fetch() ) {
+        $references[$pages->id] = array('id'       => $pages->id,
+                                        'title'    => $pages->title,
+                                        'rendered' => $pages->title . '[id:' . $pages->id . ']' );
+    }
+    
+    return $references;
+}
+
+function _civicrm_reference_fields_get_values_event($ids=array( ), $limit=25) {
+    $references = array();
+    if (!civicrm_initialize()) return $references;
+    
+    $query = "SELECT id, title FROM civicrm_event WHERE ( civicrm_event.is_template IS NULL OR civicrm_event.is_template = 0 ) AND is_active = 1 ";
+    
+    if (!empty($ids)) {
+        $query .= "AND id IN (" . implode(',', $ids) . ')'; 
+    }
+    if ( $limit ) {
+        $query .= " LIMIT 0, $limit"; 
+    }
+
+    $pages = CRM_Core_DAO::executeQuery( $query );
+    while ( $pages->fetch( ) ) {
+        $references[$pages->id] = array('id'       => $pages->id,
+                                        'title'    => $pages->title,
+                                        'rendered' => $pages->title . '[id:' . $pages->id . ']' );
+    }
+    
+    return $references;
+}
+
+function _civicrm_reference_fields_get_type($field) {
+    return substr($field['type'], 25);
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+
+// function civicrm_reference_fields_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+    
+//     $element += array(
+//                       '#type'              => 'textfield',    
+//                       '#autocomplete_path' => $instance['widget']['settings']['autocomplete_path'] . '/' . $field['field_name'],
+//                       '#size'              => $instance['widget']['settings']['size'],
+//                       '#maxlength'         => 1024,
+//                       '#default_value'     => '',
+//                       '#element_validate'  => array('civicrm_reference_fields_validate'),
+//                       );
+  
+//   return array('contact_id' => $element);
+
+// }
+
+/**
+ * Implements hook_field_widget_error().
+ */
+function civicrm_reference_fields_field_widget_error($element, $error, $form, &$form_state) {
+  form_error($element, $error['message']);
+}
+
+/**
+ * Implements hook_field_settings_form().
+ */
+function civicrm_reference_fields_field_settings_form($field, $instance, $has_data) {
+    
+    $settings = $field['settings'];
+    $form = array( );
+    
+    if ( $field['type'] == 'civicrm_reference_fields_event') {
+        $label = 'CiviCRM Event Pages';
+    } else {
+        $label = 'CiviCRM Contribution Pages';
+    }
+
+    $form['allowed_values'] = array(
+                                    '#type'          => 'checkbox',
+                                    '#title'         => t('@1 Created by current logged in user', array( '@1' => $label ) ),
+                                    '#default_value' => isset($settings['allowed_values'])? $settings['allowed_values'] : NULL,
+                                    '#weight'        => 1,
+                                    );
+    return $form;
+}
+
+/**
+ * Form element validate handler for civicrm contact autocomplete element.
+ */
+// function civicrm_reference_fields_autocomplete_validate($element, &$form_state) {
+
+//     $field = field_info_field( $element['#field_name'] );
+//     $field_key  = $element['#columns'][0];
+//     $delta = $element['#delta'];
+//     $value = $element['#value'];
+  
+//     $cid = null;
+//     if (!empty($value)) {
+//         preg_match('/^(?:\s*|(.*) )?\[\s*cid\s*:\s*(\d+)\s*\]$/', $value, $matches);
+//         if (!empty($matches)) {
+//             // Explicit [cid:n].
+//             $cid = $matches[2];
+//         }
+//         else {
+//             // No explicit cid.
+//             $cids = _civicrm_reference_fields_potential_references($field, $value, TRUE);
+//             if (empty($cids)) {
+//                 form_error($element, t('%name: found no valid post with that title.', array('%name' => $element['#title'] ) ) );
+//             }
+//             else {
+//                 // TODO:
+//                 // the best thing would be to present the user with an additional form,
+//                 // allowing the user to choose between valid candidates with the same title
+//                 // ATM, we pick the first matching candidate...
+//                 $cid = array_shift(array_keys($cids));
+//             }
+//         }
+//     }
+    
+//     form_set_value($element, $cid, $form_state);
+// }
+
+/*
+ * Function to provide values for autocomplete civicrm contact
+ * element, depend upon entered string.
+ */
+// function civicrm_reference_fields_autocomplete_value( $field_name, $string = '' ) {
+//     if ( ! civicrm_initialize( ) ) {
+//         return;
+//     }
+
+//     $field = field_info_field($field_name);;
+//     $matches = array();
+
+//     $references = _civicrm_reference_fields_potential_references($field, $string);
+//     foreach ($references as $id => $row) {
+//         // Add a class wrapper for a few required CSS overrides.
+//         $matches["{$row['title']} [cid:{$id}]"] = '<div class="reference-autocomplete">'. $row['rendered'] . '</div>';
+//     }
+//     drupal_json_output( $matches );
+// }
+
+
+/**
+ * Fetch an array of all candidate referenced nodes.
+ *
+ * This info is used in various places (aloowed values, autocomplete results,
+ * input validation...). Some of them only need the nids, others nid + titles,
+ * others yet nid + titles + rendered row (for display in widgets).
+ * The array we return contains all the potentially needed information, and lets
+ * consumers use the parts they actually need.
+ *
+ * @param $field
+ *   The field description.
+ * @param $string
+ *   Optional string to filter titles on (used by autocomplete)
+ * @param $exact_string
+ *   Optional: should the title filter be an exact match.
+ *
+ * @return
+ *   An array of valid nodes in the form:
+ *   array(
+ *     nid => array(
+ *       'title' => The node title,
+ *       'rendered' => The text to display in widgets (can be HTML)
+ *     ),
+ *     ...
+ *   )
+ */
+// function _civicrm_reference_fields_references($field, $string = '', $exact_string = FALSE) {
+//     static $results = array();
+
+//     // $references = _civicrm_contact_ref_potential_references_standard($field, $string, $exact_string);
+
+//     // Store the results.
+//     $results[$field['field_name']][$string][$exact_string] = $references;
+
+//     return $results[$field['field_name']][$string][$exact_string];
+// }
+
+/**
+ * Helper function for formatters.
+ *
+ * Store node titles collected in the curent request.
+ */
+function _civicrm_reference_fields_get_title($cid, $field = 'display_name' ) 
+{
+    if ( ! civicrm_initialize( ) ) {
+        return;
+    }
+    static $titles = array();
+    
+    if ( ! isset( $titles["{$cid}_{$field}"] ) ) {
+        $q = "
+SELECT {$field}
+FROM   civicrm_contact
+WHERE  id = %1";
+        $params = array(1 => array($cid, "Integer"));
+        $dao =& CRM_Core_DAO::executeQuery( $q, $params );
+
+        $titles["{$cid}_{$field}"] = $dao->fetch() ? $dao->$field : '';
+    }
+    return $titles["{$cid}_{$field}"];
+}
+
+function _civicrm_reference_fields_get_details($items, $field) {
+    if (empty($items)) return NULL;
+    
+    $field_type = _civicrm_reference_fields_get_type($field);
+    $field_id = 'civicrm_reference_id'; 
+    $ids = array( );
+    foreach ($items as $delta => $item) {
+          if (isset($item[$field_id]) && is_numeric($item[$field_id]) ) {
+              $ids[] = $item[$field_id];
+          }
+    }
+    if (empty($ids)) return NULL;
+    
+    $function = '_civicrm_reference_fields_get_values_' . $field_type;
+    $values = $function($ids, NULL);
+    
+    if (empty($values)) return NULL;
+    
+    return $values;
+}
