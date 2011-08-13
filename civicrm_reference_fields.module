@@ -101,11 +101,11 @@ function civicrm_reference_fields_field_formatter_info()
     return array(
                  'civicrm_reference_fields_link' => array(
                                                      'label'           => t('Title (link)'),
-                                                     'field types'     => array('civicrm_reference_fields_autocomplete_contribution', 'civicrm_reference_fields_autocomplete_event')
+                                                     'field types'     => array('civicrm_reference_fields_contribution', 'civicrm_reference_fields_event')
                                                      ),
                  'civicrm_reference_fields_plain' => array(
                                                       'label'           => t('Title (plain)'),
-                                                      'field types'     => array('civicrm_reference_fields_autocomplete_contribution', 'civicrm_reference_fields_autocomplete_event')
+                                                      'field types'     => array('civicrm_reference_fields_contribution', 'civicrm_reference_fields_event')
                                                       )
                  
                  );
@@ -147,10 +147,10 @@ function civicrm_reference_fields_field_formatter_view($entity_type, $entity, $f
 
   case 'civicrm_reference_fields_plain':
       foreach ($items as $delta => $item) {
-          if (isset($item[$field_id]) && is_numeric($item[$field_id])) {
+          if (!empty($item[$field_id]) &&  isset($values[$item[$field_id]])) {
               $element[$delta] = 
               array(
-                    '#markup' => _civicrm_reference_fields_get_title($item[$field_id]),
+                    '#markup' => $values[$item[$field_id]]['title']
                     );
           }
       }
