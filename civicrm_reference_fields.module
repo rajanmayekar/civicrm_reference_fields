@@ -37,6 +37,13 @@ function civicrm_reference_fields_field_info( ) {
                        'default_widget'    => 'options_select',
                        'default_formatter' => 'civicrm_reference_fields_link',
                        ),
+                 'civicrm_reference_fields_pcp' => 
+                 array(
+                       'label'             => t('CiviCRM Personal Campaign Pages'),
+                       'description'       => t('Reference a CiviCRM Personal Campaign Pages.'),
+                       'default_widget'    => 'options_select',
+                       'default_formatter' => 'civicrm_reference_fields_link',
+                       ),
                  );
 }
 
@@ -62,7 +69,16 @@ function civicrm_reference_fields_field_widget_info() {
                                            'size' => 100,
                                            'autocomplete_path' => 'civicrm_reference_fields/autocomplete/event',
                                            ),
-                       )
+                       ),
+                 'civicrm_reference_fields_autocomplete_pcp' => 
+                 array(
+                       'label' => t('Autocomplete text field'),
+                       'field types' => array('civicrm_reference_fields_pcp'),
+                       'settings' => array(
+                                           'size' => 100,
+                                           'autocomplete_path' => 'civicrm_reference_fields/autocomplete/pcp',
+                                           ),
+                       ),
                  );
                  
 }
@@ -73,8 +89,11 @@ function civicrm_reference_fields_field_widget_info() {
 function civicrm_reference_fields_field_widget_info_alter(&$info) {
     $info['options_select']['field types'][] = 'civicrm_reference_fields_contribution';
     $info['options_select']['field types'][] = 'civicrm_reference_fields_event';
+    $info['options_select']['field types'][] = 'civicrm_reference_fields_pcp';
+
     $info['options_buttons']['field types'][] = 'civicrm_reference_fields_contribution';
     $info['options_buttons']['field types'][] = 'civicrm_reference_fields_event';
+    $info['options_buttons']['field types'][] = 'civicrm_reference_fields_pcp';
 }
 
 /**
@@ -100,11 +119,11 @@ function civicrm_reference_fields_field_formatter_info()
     return array(
                  'civicrm_reference_fields_link' => array(
                                                      'label'           => t('Title (link)'),
-                                                     'field types'     => array('civicrm_reference_fields_contribution', 'civicrm_reference_fields_event')
+                                                     'field types'     => array('civicrm_reference_fields_contribution', 'civicrm_reference_fields_event', 'civicrm_reference_fields_pcp')
                                                      ),
                  'civicrm_reference_fields_plain' => array(
                                                       'label'           => t('Title (plain)'),
-                                                      'field types'     => array('civicrm_reference_fields_contribution', 'civicrm_reference_fields_event')
+                                                      'field types'     => array('civicrm_reference_fields_contribution', 'civicrm_reference_fields_event', 'civicrm_reference_fields_pcp')
                                                       )
                  
                  );
@@ -126,9 +145,14 @@ function civicrm_reference_fields_field_formatter_view($entity_type, $entity, $f
         $path = '';
         if ($field_type == 'contribution') {
             $path = 'civicrm/contribute/transact';
-        } elseif ($field_type == 'event') {
+        } 
+        elseif ($field_type == 'event') {
             $path = 'civicrm/event/info';
+        } 
+        elseif ($field_type == 'pcp') {
+            $path = "civicrm/contribute/pcp/info";
         }
+
         foreach ($items as $delta => $item) {
             if (!empty($item[$field_id]) &&  isset($values[$item[$field_id]])) {
                 $item_details = $values[$item[$field_id]];
@@ -231,6 +255,36 @@ function _civicrm_reference_fields_get_values_event($ids=array( ), $title='', $l
 
     $pages = CRM_Core_DAO::executeQuery($query, $params);
     while ($pages->fetch()) {
+        $references[$pages->id] = array('id'       => $pages->id,
+                                        'title'    => $pages->title,
+                                        'rendered' => $pages->title . ' [id:' . $pages->id . ']' );
+    }
+    
+    return $references;
+}
+
+function _civicrm_reference_fields_get_values_pcp($ids=array( ), $title='', $limit=25) {
+    $references = array();
+    if (!civicrm_initialize()) return $references;
+
+    $params = array( );
+    $query = "SELECT id, title FROM civicrm_pcp WHERE is_active = 1 ";
+    if (!empty($ids)) {
+        $query .= "AND id IN (" . implode(',', $ids) . ')'; 
+    }
+
+    if ($title) {
+        $query .= "AND title LIKE %1";
+        $params[1] = array($title, 'String');
+    }
+    
+    $query .= " ORDER BY title";    
+    if ( $limit ) {
+        $query .= " LIMIT 0, $limit"; 
+    }
+
+    $pages = CRM_Core_DAO::executeQuery($query, $params);
+    while( $pages->fetch() ) {
         $references[$pages->id] = array('id'       => $pages->id,
                                         'title'    => $pages->title,
                                         'rendered' => $pages->title . ' [id:' . $pages->id . ']' );
@@ -373,7 +427,8 @@ function _civicrm_reference_fields_get_details($items, $field) {
 
 function _civicrm_reference_fields_find_references($type, $field, $string, $match_exact=FALSE, $limit=10) {
     $references = array();
-    if ( !($table = array_search($type, _civicrm_reference_fields_available_types()))) {
+    $ref_types  = _civicrm_reference_fields_available_types();
+    if ( !($table = array_search($type, array_keys($ref_types)))) {
         return $references;
     }
     
@@ -388,7 +443,8 @@ function _civicrm_reference_fields_find_references($type, $field, $string, $matc
 
 
 function _civicrm_reference_fields_available_types( ) {
-    return array( 'civicrm_event' => 'event', 
-                  'civicrm_contribution' => 'contribution');
+    return array( 'event' => t('CiviCRM Event Page(s)'), 
+                  'contribution' => t('CiviCRM Contribution Page(s)'),
+                  'pcp' => t('CiviCRM Personal Campaign Page(s)') );
     
 }
