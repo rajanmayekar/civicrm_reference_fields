@@ -9,7 +9,6 @@ function civicrm_reference_fields_menu()
     $items = array();
     $items['civicrm_reference_fields/autocomplete/%'] = 
         array(
-              'title'            => t('Contacts'),
               'page callback'    => 'civicrm_reference_fields_autocomplete_value',
               'type'             => MENU_CALLBACK,
               'access arguments' => array('access content'),
@@ -192,18 +191,42 @@ function civicrm_reference_fields_field_formatter_view($entity_type, $entity, $f
  *   The array of valid contacts.
  */
 function civicrm_reference_fields_allowed_values($field) {
+    $type = _civicrm_reference_fields_get_type($field);
     
-    $function = '_civicrm_reference_fields_get_values_' . _civicrm_reference_fields_get_type($field);
-    $references = $function( );
+    $where        = array( );
+    $date_filters = array('allowed_start_date' => 'start_date', 'allowed_end_date' => 'end_date');
+    foreach($date_filters as $filter => $column) {
+        if (!isset($field['settings'][$filter])) {
+            continue;
+        }
+        if ($field['settings'][$filter] == 'before') {
+            $where[$column] = array( 'value' => date('Ymd') . '000000',
+                                     'type'  => 'String',
+                                     'op'    => '<',
+                                     'isnull' => true );
+        } 
+        elseif ($field['settings'][$filter] == 'after') {
+            $where[$column] = array( 'value' => date('Ymd') . '000000',
+                                     'type'  => 'String',
+                                     'op'    => '>',
+                                     'isnull' => true );
+        }
+    }
+    
+    $function = '_civicrm_reference_fields_get_values_' . $type;
+
+    $references = $function(NULL, NULL, $where);
+
     $options = array();
     foreach ($references as $key => $value) {
         $options[$key] = html_entity_decode(strip_tags($value['title']));
     }
+
     return $options;
 }
 
 
-function _civicrm_reference_fields_get_values_contribution($ids=array( ), $title='', $limit=25) {
+function _civicrm_reference_fields_get_values_contribution($ids=array( ), $title='', $extra_where = array( ), $limit=25) {
     $references = array();
     if (!civicrm_initialize()) return $references;
 
@@ -217,10 +240,17 @@ function _civicrm_reference_fields_get_values_contribution($ids=array( ), $title
         $query .= "AND title LIKE %1";
         $params[1] = array($title, 'String');
     }
+
+    $where = array( );
+    _civicrm_reference_fields_build_extra_where($extra_where, $where, $params);
+    
+    if (!empty($where)) {
+        $query .= ' AND ' . implode(' AND ', $where);
+    }
     
     $query .= " ORDER BY start_date, title";    
     if ( $limit ) {
-        $query .= " LIMIT 0, $limit"; 
+        $query .= " LIMIT 0, $limit";
     }
 
     $pages = CRM_Core_DAO::executeQuery($query, $params);
@@ -233,7 +263,7 @@ function _civicrm_reference_fields_get_values_contribution($ids=array( ), $title
     return $references;
 }
 
-function _civicrm_reference_fields_get_values_event($ids=array( ), $title='', $limit=25) {
+function _civicrm_reference_fields_get_values_event($ids=array( ), $title='', $extra_where = array( ), $limit=25) {
     $references = array();
     if (!civicrm_initialize()) return $references;
     
@@ -247,6 +277,13 @@ function _civicrm_reference_fields_get_values_event($ids=array( ), $title='', $l
     if ($title) {
         $query .= "AND title LIKE %1";
         $params[1] = array($title, 'String');
+    }
+
+    $where = array( );
+    _civicrm_reference_fields_build_extra_where($extra_where, $where, $params);
+    
+    if (!empty($where)) {
+        $query .= ' AND ' . implode(' AND ', $where);
     }
 
     if ($limit) {
@@ -263,7 +300,7 @@ function _civicrm_reference_fields_get_values_event($ids=array( ), $title='', $l
     return $references;
 }
 
-function _civicrm_reference_fields_get_values_pcp($ids=array( ), $title='', $limit=25) {
+function _civicrm_reference_fields_get_values_pcp($ids=array( ), $title='', $extra_where = array( ), $limit=25) {
     $references = array();
     if (!civicrm_initialize()) return $references;
 
@@ -278,6 +315,13 @@ function _civicrm_reference_fields_get_values_pcp($ids=array( ), $title='', $lim
         $params[1] = array($title, 'String');
     }
     
+    $where = array( );
+    _civicrm_reference_fields_build_extra_where($extra_where, $where, $params);
+    
+    if (!empty($where)) {
+        $query .= ' AND ' . implode(' AND ', $where);
+    }
+
     $query .= " ORDER BY title";    
     if ( $limit ) {
         $query .= " LIMIT 0, $limit"; 
@@ -335,25 +379,44 @@ function civicrm_reference_fields_field_widget_error($element, $error, $form, &$
 /**
  * Implements hook_field_settings_form().
  */
-// function civicrm_reference_fields_field_settings_form($field, $instance, $has_data) {
+function civicrm_reference_fields_field_settings_form($field, $instance, $has_data) {
     
-//     $settings = $field['settings'];
-//     $form = array( );
+    $type  = _civicrm_reference_fields_get_type($field);
+    $form = array( );
     
-//     if ( $field['type'] == 'civicrm_reference_fields_event') {
-//         $label = 'CiviCRM Event Pages';
-//     } else {
-//         $label = 'CiviCRM Contribution Pages';
-//     }
+    if (!in_array($type, array('event', 'contribution' ))) {
+        return $form;
+    }
+        
+    $settings = $field['settings'];
+        
+    if ( $type == 'event') {
+         $label = 'CiviCRM Event';
+     } else {
+         $label = 'CiviCRM Contribution';
+     }
 
-//     $form['allowed_values'] = array(
-//                                     '#type'          => 'checkbox',
-//                                     '#title'         => t('@1 Created by current logged in user', array( '@1' => $label ) ),
-//                                     '#default_value' => isset($settings['allowed_values'])? $settings['allowed_values'] : NULL,
-//                                     '#weight'        => 1,
-//                                     );
-//     return $form;
-// }
+     $options = array( '' => t('none'),
+                       'before' => t('Prior to current date'),
+                       'after'  => t('current date or later than current date') );
+     
+     $form['allowed_start_date'] = array(
+                                         '#type'          => 'radios',
+                                         '#title'         => t('@1 Start date is', array( '@1' => t($label) ) ),
+                                         '#default_value' => isset($settings['allowed_start_date'])? $settings['allowed_start_date'] : '',
+                                         '#options'       => $options,
+                                         '#weight'        => 1,
+                                     );
+     $form['allowed_end_date'] = array(
+                                         '#type'          => 'radios',
+                                         '#title'         => t('@1 End date is', array( '@1' => t($label) ) ),
+                                         '#default_value' => isset($settings['allowed_end_date'])? $settings['allowed_end_date'] : '',
+                                         '#options'       => $options,
+                                         '#weight'        => 2,
+                                     );
+     
+     return $form;
+}
 
 /**
  * Form element validate handler for civicrm contact autocomplete element.
@@ -437,8 +500,28 @@ function _civicrm_reference_fields_find_references($type, $field, $string, $matc
         $string = "%{$string}%";
     }
 
+    $where        = array( );
+    $date_filters = array('allowed_start_date' => 'start_date', 'allowed_end_date' => 'end_date');
+    foreach($date_filters as $filter => $column) {
+        if (!isset($field['settings'][$filter])) {
+            continue;
+        }
+        if ($field['settings'][$filter] == 'before') {
+            $where[$column] = array( 'value' => date('Ymd') . '000000',
+                                     'type'  => 'String',
+                                     'op'    => '<',
+                                     'isnull' => true );
+        } 
+        elseif ($field['settings'][$filter] == 'after') {
+            $where[$column] = array( 'value' => date('Ymd') . '000000',
+                                     'type'  => 'String',
+                                     'op'    => '>',
+                                     'isnull' => true );
+        }
+    }
+
     $function = '_civicrm_reference_fields_get_values_' . $type;
-    return $function(array( ), trim($string), $limit);
+    return $function(NULL, trim($string), $where, $limit);
 }
 
 
@@ -447,4 +530,26 @@ function _civicrm_reference_fields_available_types( ) {
                   'contribution' => t('CiviCRM Contribution Page(s)'),
                   'pcp' => t('CiviCRM Personal Campaign Page(s)') );
     
+}
+
+function _civicrm_reference_fields_build_extra_where($extra_where, &$where, &$params) {
+    if ( empty($extra_where) ) {
+        return;
+    }
+    
+    $count = 2;
+
+    foreach( $extra_where as $field => $details ) {
+        if ( empty($details) || empty($details['value']) ) {
+            
+        }
+        $type = empty($details['type']) ? 'String' : $details['type'];
+        $op   = empty($details['op']) ? '=' : $details['op'];
+        $where[$count]  = "{$field} {$op} %{$count}";
+        $params[$count] = array($details['value'], $type);
+        if( isset($details['isnull']) && $details['isnull'] ) {
+            $where[$count] = "(". $where[$count]." OR {$field} IS NULL)";
+        }
+        $count++;
+    } 
 }
