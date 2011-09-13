@@ -1,7 +1,7 @@
 <?php
 
- /**
- * Implemetation of hook_menu, retrieve conatacts from civicrm for
+/**
+ * Implemetation of hook_menu, retrieve values from civicrm for
  * autocomplete widget.
  */
 function civicrm_reference_fields_menu() 
@@ -491,7 +491,8 @@ function _civicrm_reference_fields_get_details($items, $field) {
 function _civicrm_reference_fields_find_references($type, $field, $string, $match_exact=FALSE, $limit=10) {
     $references = array();
     $ref_types  = _civicrm_reference_fields_available_types();
-    if ( !($table = array_search($type, array_keys($ref_types)))) {
+    
+    if ( !in_array($type, array_keys($ref_types) ) ) {
         return $references;
     }
     
