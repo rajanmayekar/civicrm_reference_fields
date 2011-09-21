@@ -208,7 +208,7 @@ function civicrm_reference_fields_allowed_values($field) {
         elseif ($field['settings'][$filter] == 'after') {
             $where[$column] = array( 'value' => date('Ymd') . '000000',
                                      'type'  => 'String',
-                                     'op'    => '>',
+                                     'op'    => '>=',
                                      'isnull' => true );
         }
     }
@@ -516,7 +516,7 @@ function _civicrm_reference_fields_find_references($type, $field, $string, $matc
         elseif ($field['settings'][$filter] == 'after') {
             $where[$column] = array( 'value' => date('Ymd') . '000000',
                                      'type'  => 'String',
-                                     'op'    => '>',
+                                     'op'    => '>=',
                                      'isnull' => true );
         }
     }
