@@ -1,7 +1,9 @@
 <?php
 
 /**
- * Implemetation of hook_menu, retrieve values from civicrm for
+ * Implemetation of hook_menu
+ *
+ * Retrieve values from civicrm for
  * autocomplete widget.
  */
 function civicrm_reference_fields_menu() 
@@ -203,13 +205,13 @@ function civicrm_reference_fields_allowed_values($field) {
             $where[$column] = array( 'value' => date('Ymd') . '000000',
                                      'type'  => 'String',
                                      'op'    => '<',
-                                     'isnull' => true );
+                                     'isnull' => TRUE );
         } 
         elseif ($field['settings'][$filter] == 'after') {
             $where[$column] = array( 'value' => date('Ymd') . '000000',
                                      'type'  => 'String',
                                      'op'    => '>=',
-                                     'isnull' => true );
+                                     'isnull' => TRUE );
         }
     }
     
@@ -419,7 +421,7 @@ function civicrm_reference_fields_field_settings_form($field, $instance, $has_da
 }
 
 /**
- * Form element validate handler for civicrm contact autocomplete element.
+ * Form element validate handler for autocomplete element.
  */
 function civicrm_reference_fields_autocomplete_validate($element, &$form_state) {
     $field = field_info_field($element['#field_name']);
@@ -447,7 +449,7 @@ function civicrm_reference_fields_autocomplete_validate($element, &$form_state) 
     form_set_value($element, $id, $form_state);
 }
 
-/*
+/**
  * Function to provide values for autocomplete civicrm contact
  * element, depend upon entered string.
  */
@@ -511,13 +513,13 @@ function _civicrm_reference_fields_find_references($type, $field, $string, $matc
             $where[$column] = array( 'value' => date('Ymd') . '000000',
                                      'type'  => 'String',
                                      'op'    => '<',
-                                     'isnull' => true );
+                                     'isnull' => TRUE );
         } 
         elseif ($field['settings'][$filter] == 'after') {
             $where[$column] = array( 'value' => date('Ymd') . '000000',
                                      'type'  => 'String',
                                      'op'    => '>=',
-                                     'isnull' => true );
+                                     'isnull' => TRUE );
         }
     }
 

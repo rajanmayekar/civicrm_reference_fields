@@ -10,6 +10,6 @@ files[] = civicrm_reference_fields.install
 files[] = civicrm_reference_fields.module
 
 ; Information added by drupal.org packaging script on 2011-08-13
-version = "7.x-2.alpha1"
+version = "7.x-1.alpha2"
 core = "7.x"
 datestamp = "1311834128"

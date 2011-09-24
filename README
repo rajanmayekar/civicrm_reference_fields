@@ -1,4 +1,11 @@
 CiviCRM Reference Fields
 
 This is drupal module for Drupal7.X and CiviCRM4.x.
-Module provides CiviCRM Contributions page, CiviCRM Event Page reference fields for drupal content.
+
+Module allow to create following of fields of type 'Select', 'Radio', 'Check-box', Autocomplete 
+
+# CiviCRM Contribution page reference field with different start date , end date criteria.
+
+# CiviCRM Event Page reference field with different event start date, end date criteria.
+
+# CiviCRM PCP page reference field.
