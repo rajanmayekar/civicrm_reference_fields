@@ -9,3 +9,5 @@ Module allow to create following of fields of type 'Select', 'Radio', 'Check-box
 # CiviCRM Event Page reference field with different event start date, end date criteria.
 
 # CiviCRM PCP page reference field.
+
+@MOVED this project is moved and maintained from https://www.drupal.org/project/civicrm_reference_fields
